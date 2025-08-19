@@ -1,28 +1,30 @@
-﻿using ImageMagick;
+using ImageMagick;
 using System.Text;
 using System.Text.Json;
-using BrailleMaker.src;
-using BrailleMaker;
+using text_to_braille;
+using text_to_braille.src;
+using static System.Net.Mime.MediaTypeNames;
 
-namespace BrailleMaker.Controls
+namespace text_to_braille.src
 {
     internal class Conversion
     {
         public static Dictionary<string, int[][][]> characters = new();
 
-        private const int symbolHorizontalSpacing = 50;
-        private const int symbolVerticalSpacing = 70;
-        private const int symbolHeight = 55;
-        private const int symbolWidth = 35;
-        private const int dotSpacing = 10;
-        private const int pngFactorHorizontalPosition = 19;
-        private const int svgFactorHorizontalPosition = 25;
+        private static readonly double diameterSvg = 4;
+        private static readonly int dotSpacingSvg = (int)Math.Floor(1.8*diameterSvg);
+        private static readonly int symbolSpacingSvg = (int)Math.Floor(6*diameterSvg);
+        private static readonly int lineSpacingSvg = (int)Math.Floor(10*diameterSvg);
 
+        private static readonly double diameterPng = 16;
+        private static readonly int dotSpacingPng = (int)Math.Floor(1.85*diameterPng);
+        private static readonly int symbolSpacingPng = (int)Math.Floor(2.97*diameterPng);
+        private static readonly int lineSpacingPng = (int)Math.Floor(9*diameterPng);
+        private static readonly int symbolWidth = (int)diameterPng + dotSpacingPng;
+        private static readonly int symbolHeight = (int)diameterPng + 2 * dotSpacingPng;
+        
+        
 
-        /// <summary>
-        /// Loads the characters from the 'char.json' file into the variable in memory.
-        /// </summary>
-        /// <param name="characters">Dictionary where the Braille information of each character will be stored.</param>
         public static void InitializeCharacters(ref Dictionary<string, int[][][]> characters)
         {
             string json = File.ReadAllText(Path.Combine(Program.DATA, "Resources", "char.json"));
@@ -30,20 +32,7 @@ namespace BrailleMaker.Controls
             characters = JsonSerializer.Deserialize<Dictionary<string, int[][][]>>(root) ?? new Dictionary<string, int[][][]>();
         }
 
-        /// <summary>
-        /// Counts how many symbols are needed to display that character in Braille.
-        /// </summary>
-        /// <param name="ch">Character that will be searched in the dictionary.</param>
-        /// <returns>Number of symbols needed to display the character in Braille.</returns>
-        
-
-        /// <summary>
-        /// Converts a character into a Braille image.
-        /// </summary>
-        /// <param name="key">Character that will be converted.</param>
-        /// <returns>Returns a <see cref="MagickImage"/> object containing the graphical representation of the character.</returns>
-        /// <exception cref="ArgumentException">Thrown if the given character is not present in the character map and is not a space.</exception>
-        public static MagickImage ConvertCharacterToPngImage(string key)
+        /*public static MagickImage ConvertCharacterToPngImage(string key)
         {
             if (!characters.TryGetValue(key, out int[][][] character) && !(key == " "))
             {
@@ -66,7 +55,6 @@ namespace BrailleMaker.Controls
             {
                 charImage = new MagickImage(MagickColors.Transparent, (uint)(len * symbolHorizontalSpacing), symbolHeight);
             }
-
             foreach (int[][] signal in character)
             {
 
@@ -79,17 +67,9 @@ namespace BrailleMaker.Controls
                 }
                 x += symbolHorizontalSpacing;
             }
-
             return charImage;
         }
 
-        /// <summary>
-        /// Converts a given text string into a composite PNG image representation using Braille character images.
-        /// </summary>
-        /// <param name="text">The input text string to be converted into an image. Supports newline characters ('\n') to create multiple lines.</param>
-        /// <returns>
-        /// A <see cref="MagickImage"/> object containing the rendered image of the entire input text composed of individual character images.
-        /// </returns>
         public static MagickImage ConvertTextToPngImage(string text)
         {
             MagickImage textImage = new MagickImage(MagickColors.Transparent, 1, 1);
@@ -118,139 +98,248 @@ namespace BrailleMaker.Controls
                     height += 1;
                     cursor = 0;
                 }
-                    
             }
-            
-            
-
-            
             return textImage;
-        }
+        }*/
 
-        /// <summary>
-        /// Converts a single character into an SVG representation of its Braille dots starting at the specified coordinates.
-        /// </summary>
-        /// <param name="ch">The character to be converted into an SVG image.</param>
-        /// <param name="startX">The starting X coordinate for the SVG dots placement.</param>
-        /// <param name="startY">The starting Y coordinate for the SVG dots placement.</param>
-        /// <returns>
-        /// A string containing SVG markup representing the Braille dots of the character.
-        /// Filled dots are drawn as circles with radius 3 and black fill; empty dots are smaller circles with radius 1 and no stroke.
-        /// </returns>
-        /// <exception cref="ArgumentException">
-        /// Thrown when the character is not found in the character map and is not a space.
-        /// </exception>
-        public static string ConvertCharacterToSvgImage(string ch, int startX, int startY)
+        public static string CreateSymbolOnSvg(int[][] symbol, int cursor, int line)
         {
-            var svgParts = new StringBuilder();
-            if (!characters.TryGetValue(ch, out int[][][] charData) && !(ch == " "))
-            {
-                throw new ArgumentException($"Character '{ch}' not found in character map.");
-            }
-            foreach (var matrix in charData)
-            {
-                for (int row = 0; row < 3; row++)
-                {
-                    for (int col = 0; col < 2; col++)
-                    {
-                        int x = startX + (col * dotSpacing);
-                        int y = startY + (row * dotSpacing) + dotSpacing;
+            var svgSymbol = new StringBuilder();
 
-                        if (matrix[row][col] == 1)
-                        {
-                            svgParts.AppendLine($"<circle cx=\"{x}\" cy=\"{y}\" r=\"3\" stroke-width=\"1\" stroke=\"#000000\" fill=\"#000000\" fill-opacity=\"1\"/>");
-                        }
-                        else
-                        {
-                            svgParts.AppendLine($"<circle cx=\"{x}\" cy=\"{y}\" r=\"1\" stroke-width=\"1\" stroke=\"none\" fill=\"#000000\" fill-opacity=\"1\"/>");
-                        }
+            int startX = (int)Math.Floor(diameterSvg / 2 + ((cursor - 1) * symbolSpacingSvg));
+            int startY = (int)Math.Floor(diameterSvg / 2 + ((line - 1) * lineSpacingSvg));
+
+            for (int i = 0; i < 3; i++)
+            {
+                for (int j = 0; j < 2; j++)
+                {
+                    int x = startX + (j * dotSpacingSvg);
+                    int y = startY + (i * dotSpacingSvg);
+
+
+                    if (symbol[i][j] == 1)
+                    {
+                        svgSymbol.AppendLine($"<circle cx=\"{x}\" cy=\"{y}\" r=\"{diameterSvg / 2}\" stroke-width=\"0\" stroke=\"none\" fill=\"#000000\" fill-opacity=\"1\"/>");
                     }
                 }
-                startX += 30;
             }
-            return svgParts.ToString();
+            return svgSymbol.ToString();
         }
 
-        /// <summary>
-        /// Converts a multi-line text string into an SVG image representation composed of Braille character patterns.
-        /// </summary>
-        /// <param name="text">The input text to convert, supporting newline characters ('\n') to create multiple lines.</param>
-        /// <returns>
-        /// A string containing the full SVG markup representing the entire input text as Braille dot patterns.
-        /// </returns>
+        public static MagickImage CreateSymbolOnPng(int[][] symbol)
+        {
+            MagickImage onImage = new MagickImage(Path.Combine(Program.DATA, "Resources", "assets", "on.png"));
+            MagickImage offImage = new MagickImage(Path.Combine(Program.DATA, "Resources", "assets", "off.png"));
+            MagickImage charImage = new MagickImage(MagickColors.Transparent, (uint)symbolWidth, (uint)symbolHeight);
+
+            for (int i = 0; i < symbol.Length; i++)
+            {
+                for (int j = 0; j < symbol[i].Length; j++)
+                {
+                    int x = j*dotSpacingPng;
+                    int y = i*dotSpacingPng;
+                    if (symbol[i][j] == 1)
+                    {
+                        charImage.Composite(onImage, x, y, CompositeOperator.Over);
+                    }
+                    else
+                    {
+                        charImage.Composite(offImage, x, y, CompositeOperator.Over);
+                    }
+                }
+            }
+
+
+            
+            return charImage;
+        }
+
+        public static string ConvertCharacterToSvgImage(ref int cursor, int line, string ch = " ", bool isCap = false, bool isUpper = false)
+        {
+            var svgChar = new StringBuilder();
+            int[][] cap = [[0, 0], [0, 0], [0, 1]];
+            int[][] upper = [[0, 1], [0, 0], [0, 1]];
+            if (isCap)
+            {
+                svgChar.AppendLine(CreateSymbolOnSvg(cap, cursor, line));
+            }
+            else if (isUpper)
+            {
+                svgChar.AppendLine(CreateSymbolOnSvg(upper, cursor, line));
+            }
+            else if (ch != " ")
+            {
+                if (!characters.TryGetValue(ch, out int[][][] charData))
+                {
+                    throw new ArgumentException($"Character '{ch}' not found in character map.");
+                }
+                foreach (int[][] symbol in charData)
+                {
+                    svgChar.AppendLine(CreateSymbolOnSvg(symbol, cursor, line));
+                    cursor++;
+                }   
+            }
+            
+            return svgChar.ToString();
+        }
+
+        public static MagickImage ConvertCharacterToPngImage(ref int cursor, string ch = " ", bool isCap = false, bool isUpper = false)
+        {
+            int len = Util.GetCharacterMatrizLenght(ch, characters);
+            uint width = (uint)((symbolWidth*len) + ((len - 1) * symbolSpacingPng));
+            uint height = (uint)symbolHeight;
+            var pngChar = new MagickImage(MagickColors.Transparent, width, height);
+
+            int[][] cap = [[0, 0], [0, 0], [0, 1]];
+            int[][] upper = [[0, 1], [0, 0], [0, 1]];
+            if (isCap || isUpper)
+            {
+                cursor++;
+                var image = isCap ? CreateSymbolOnPng(cap) : CreateSymbolOnPng(upper);
+                return image;
+            }
+
+            characters.TryGetValue(ch, out int[][][] charData);
+            
+            for (int i = 0; i < charData.Length; i++)
+            {   
+                int x = (i * symbolWidth) + (i * symbolSpacingPng);
+                int y = 0;
+
+                pngChar.Composite(CreateSymbolOnPng(charData[i]), x, y, CompositeOperator.Over);
+                cursor++;
+            }
+            return pngChar;
+        }
+
+        public static MagickImage ConvertTextToPngImage(string text)
+        {
+
+            int line, cursor, columns, rows;
+            columns = 0;
+            rows = 1;
+            cursor = line = 1;
+            
+
+            MagickImage textImage;
+            string[] words = text.Replace("\n", " \n ").Split(' ');
+
+            foreach (string word in words)
+            {
+                if (word[0] == '\n')
+                {
+                    rows++;
+                }
+                else
+                {
+                    bool isCapitalize = Util.isCapitalize(word);
+                    bool isUpper = Util.isUpper(word);
+                    string word_aux = word.ToLower();
+                    if (isCapitalize || isUpper)
+                    {
+                        columns++;
+                    }
+                    foreach (char ch in word_aux)
+                    {
+                        columns += Util.GetCharacterMatrizLenght(ch.ToString(), characters);
+                    }
+                }
+                if (!(word == words.LastOrDefault()))
+                {
+                    columns++;
+                }   
+                
+            }
+
+            Console.WriteLine($"Tamanho da imagem: c={columns} r={rows}");
+
+            uint width = (uint)((columns * symbolWidth) + ((columns - 1) * symbolSpacingPng));
+            uint height = (uint)((rows * symbolHeight) + ((rows - 1) * lineSpacingPng));
+
+            textImage = new MagickImage(MagickColors.Transparent, width, height);
+            Console.WriteLine($"Tamanho da imagem: w={width} h={height}");
+
+            foreach (string word in words)
+            {
+                if (word == "\n")   
+                {
+                    cursor = 1;
+                    line++;
+                }
+                else
+                {
+                    bool isCapitalize = Util.isCapitalize(word);
+                    bool isUpper = Util.isUpper(word);
+                    string word_aux = word.ToLower();
+                    if (isCapitalize || isUpper)
+                    {
+                        int x = ((cursor - 1) * symbolWidth) + (cursor - 1 >= 0 ? cursor - 1 : 0) * symbolSpacingPng;
+                        int y = ((line - 1) * symbolHeight) + (line - 1 >= 0 ? line - 1 : 0) * symbolHeight;
+                        var charImage = ConvertCharacterToPngImage(ref cursor, isCap: isCapitalize, isUpper: isUpper);
+                        textImage.Composite(charImage, x, y, CompositeOperator.Over);
+                    }
+                    foreach (char ch in word_aux)
+                    { 
+                        int x = ((cursor-1) * symbolWidth) + (cursor - 1 >= 0 ? cursor - 1 : 0) * symbolSpacingPng;
+                        int y = ((line - 1) * symbolHeight) + (line - 1 >= 0 ? line - 1 : 0) * symbolHeight;
+                        var charImage = ConvertCharacterToPngImage(ref cursor, ch.ToString());
+                        textImage.Composite(charImage, x, y, CompositeOperator.Over);
+                        
+                    }
+                }
+            }
+            return textImage;
+
+        }
+
         public static string ConvertTextToSvgImage(string text)
         {
-            int line = 0;
-            int cx = dotSpacing;
-            int cy = 0;
-            int height = 1;
-            int currentWidth = 0;
-            int maxWidth = 0;
+            int line, cursor, width;
+            line = cursor = 1;
+            width = 0;
 
-            List<int> lineWidths = new List<int>();
+            StringBuilder svgParts = new StringBuilder();
 
-            for (int i = 0; i < text.Length; i++)
+            string[] words = text.Replace("\n", " \n ").Split(' ');
+
+            foreach (string word in words)
             {
-                string ch = text[i].ToString();
-                int chLen = Util.GetCharacterMatrizLenght(ch, characters);
-                if (ch == "\n")
+                if (word[0] == '\n')
                 {
-                    height++;
-                    lineWidths.Add(currentWidth);
-                    currentWidth = 0;
-                }
-                else if (ch != " ")
-                {
-                    currentWidth += (chLen * symbolWidth) + dotSpacing;
-                }
-                else
-                {
-                    currentWidth += chLen * dotSpacing;
-                }
-            }
-            lineWidths.Add(currentWidth);
-
-            foreach (var w in lineWidths)
-                if (w > maxWidth) maxWidth = w;
-
-            // Construção do SVG
-            var svgParts = new StringBuilder();
-            
-            svgParts.AppendLine("<?xml version=\"1.0\" standalone=\"no\"?>");
-            svgParts.AppendLine("<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 20010904//EN\" \"http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd\">");
-            svgParts.AppendLine($"<svg width=\"{maxWidth}px\" height=\"{height * symbolHorizontalSpacing}px\" xmlns=\"http://www.w3.org/2000/svg\">");
-            svgParts.AppendLine("<desc>SVG Output</desc>");
-
-
-            for (int i = 0; i < text.Length; i++)
-            {
-                string ch = text[i].ToString();
-                int chLen = Util.GetCharacterMatrizLenght(ch, characters);
-                if (ch == "\n")
-                {
+                    cursor = 1;
                     line++;
-                    cx = dotSpacing;
-                    continue;
-                }
-
-                if (ch != " ")
-                {
-                    cy = symbolHorizontalSpacing * line;
-                    svgParts.Append(ConvertCharacterToSvgImage(ch, cx, cy));
-
-                    cx += (chLen * svgFactorHorizontalPosition) + dotSpacing;
                 }
                 else
                 {
-                    cx += dotSpacing;
+                    bool isCapitalize = Util.isCapitalize(word);
+                    bool isUpper = Util.isUpper(word);
+                    string word_aux = word.ToLower();
+                    if (isCapitalize || isUpper)
+                    {
+                        svgParts.AppendLine(ConvertCharacterToSvgImage(cursor: ref cursor, line: line, isCap: isCapitalize, isUpper: isUpper));
+                        cursor++;
+                        width = cursor > width ? cursor : width;
+                    }
+                    foreach (char ch in word_aux)
+                    {
+                        svgParts.AppendLine(ConvertCharacterToSvgImage(ref cursor, line, ch.ToString()));
+                        width = cursor > width ? cursor : width;
+                    }
                 }
             }
 
+            var svgText = new StringBuilder();
 
-            string SvgFooter = "\n</svg>";
-            svgParts.AppendLine(SvgFooter);
+            svgText.AppendLine("<?xml version=\"1.0\" standalone=\"no\"?>");
+            svgText.AppendLine("<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 20010904//EN\" \"http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd\">");
+            svgText.AppendLine($"<svg width=\"{width * symbolSpacingSvg}px\" height=\"{line * lineSpacingSvg}px\" xmlns=\"http://www.w3.org/2000/svg\">");
+            svgText.AppendLine("<desc>SVG Output</desc>");
 
-            return svgParts.ToString();
+            svgText.AppendLine(svgParts.ToString());
+
+            svgText.AppendLine("</svg>");            
+
+            return svgText.ToString();
         }
     }
 }
